@@ -110,9 +110,7 @@ paths:
       operationId: getInputFile
       summary: Get an input file with the specific ID
       description: >
-        Returns metadata for a specific input file. Implementations may also
-        include a download URL or storage location if the caller is allowed to
-        retrieve the underlying file.
+        Returns metadata for a specific input file.
       parameters:
         - name: input_id
           in: path
@@ -148,14 +146,14 @@ components:
         filename:
           type: string
           description: Name of the created or registered input file.
-          example: baseline_2030.csv
+          example: case_study_input.csv
         description:
           type: string
           description: Human-readable description of the input file.
-          example: Baseline scenario inputs for 2030.
+          example: Inputs for the baseline scenario.
         format:
           type: string
-          description: File format of the uploaded IAMC long-format input package.
+          description: Format of the uploaded IAMC long-format input file.
           enum:
             - csv
           example: csv
@@ -175,7 +173,7 @@ components:
           items:
             type: string
           example:
-            - model_inputs/energy_prices.csv
+            - model_inputs.sqlite
         warnings:
           type: array
           description: Non-blocking issues found while creating the input file.
