@@ -1,0 +1,242 @@
+openapi: 3.1.0
+info:
+  title: MIC3 Model Linking API
+  version: 0.1.0
+  description: >
+    Common API contract for MIC3 model adapters. 
+    Developed in the context of the Horizon Europe project TRANSIENCE project.
+
+servers:
+  - url: https://example.org/api/v1
+    description: Example production server
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: Inputs
+    description: Operations for creating and retrieving model input files.
+
+paths:
+  /inputs:
+    post:
+      tags:
+        - Inputs
+      operationId: createInputFile
+      summary: Create a new input file for the model
+      description: >
+        Creates a new model input file from an uploaded IAMC long-format CSV
+        file. A model adapter can translate this package into the model's native
+        input format, such as model-specific CSV files, configuration files, or
+        database records. The uploaded CSV must include the columns model,
+        scenario, region, variable, unit, year, and value.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateInputFileRequest"
+            encoding:
+              file:
+                contentType: text/csv
+      responses:
+        "201":
+          description: Input file created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InputFile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags:
+        - Inputs
+      operationId: listInputFiles
+      summary: Get all available input files
+      description: >
+        Returns the input files available to the model adapter, including
+        metadata such as the file format and creation time.
+        To retrieve the latest input file, use limit=1 and sort=-created_at.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of input files to return.
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+            example: 1
+        - name: sort
+          in: query
+          required: false
+          description: >
+            Sort order for returned input files. Use -created_at to return the
+            newest files first.
+          schema:
+            type: string
+            enum:
+              - created_at
+              - -created_at
+            default: -created_at
+            example: -created_at
+      responses:
+        "200":
+          description: Available input files returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InputFileList"
+
+  /inputs/{input_id}:
+    get:
+      tags:
+        - Inputs
+      operationId: getInputFile
+      summary: Get an input file with the specific ID
+      description: >
+        Returns metadata for a specific input file. Implementations may also
+        include a download URL or storage location if the caller is allowed to
+        retrieve the underlying file.
+      parameters:
+        - name: input_id
+          in: path
+          required: true
+          description: Unique identifier of the input file.
+          schema:
+            type: string
+            example: input_2026_001
+      responses:
+        "200":
+          description: Input file returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InputFile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  schemas:
+    CreateInputFileRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: >
+            IAMC long-format CSV file to apply to the model. The file must
+            include the columns model, scenario, region, variable, unit, year,
+            and value.
+        description:
+          type: string
+          description: Human-readable description of the input file.
+          example: Baseline scenario inputs for 2030.
+
+    InputFile:
+      type: object
+      required:
+        - input_id
+        - filename
+        - format
+        - created_at
+      properties:
+        input_id:
+          type: string
+          description: Unique identifier of the input file.
+          example: input_2026_001
+        filename:
+          type: string
+          description: Name of the created or registered input file.
+          example: baseline_2030.csv
+        description:
+          type: string
+          description: Human-readable description of the input file.
+          example: Baseline scenario inputs for 2030.
+        format:
+          type: string
+          description: File format of the uploaded IAMC long-format input package.
+          enum:
+            - csv
+          example: csv
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time when the input file was created.
+          example: "2026-05-25T15:30:00Z"
+        download_url:
+          type: string
+          format: uri
+          description: Optional URL for downloading the input file.
+          example: https://example.org/api/v1/inputs/input_2026_001/download
+        modified_files:
+          type: array
+          description: Native model files modified when creating this input file.
+          items:
+            type: string
+          example:
+            - model_inputs/energy_prices.csv
+        warnings:
+          type: array
+          description: Non-blocking issues found while creating the input file.
+          items:
+            type: string
+          example: []
+
+    InputFileList:
+      type: object
+      required:
+        - items
+        - count
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InputFile"
+        count:
+          type: integer
+          minimum: 0
+          description: Number of input files returned.
+          example: 2
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: input_file_not_found
+        message:
+          type: string
+          description: Human-readable error message.
+          example: The requested input file could not be found.
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional structured details about the error.
+
+  responses:
+    BadRequest:
+      description: The request could not be processed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: The input file did not pass validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
