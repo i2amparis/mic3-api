@@ -19,6 +19,8 @@ servers:
 tags:
   - name: Inputs
     description: Operations for creating and retrieving model input files.
+  - name: Outputs
+    description: Operations for retrieving model output files.
   - name: Config
     description: Operations for retrieving and updating model configuration files.
   - name: Simulation
@@ -134,6 +136,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InputFile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /outputs:
+    get:
+      tags:
+        - Outputs
+      operationId: listOutputFiles
+      summary: Get all available output files
+      description: >
+        Returns the output files available from the model adapter, including
+        metadata such as the file format and creation time.
+        To retrieve the latest output file, use limit=1 and sort=-created_at.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of output files to return.
+          schema:
+            type: integer
+            minimum: 1
+            default: 100
+            example: 1
+        - name: sort
+          in: query
+          required: false
+          description: >
+            Sort order for returned output files. Use -created_at to return the
+            newest files first.
+          schema:
+            type: string
+            enum:
+              - created_at
+              - -created_at
+            default: -created_at
+            example: -created_at
+      responses:
+        "200":
+          description: Available output files returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutputFileList"
+
+  /outputs/{output_id}:
+    get:
+      tags:
+        - Outputs
+      operationId: getOutputFile
+      summary: Get an output file with the specific ID
+      description: >
+        Returns metadata for a specific output file.
+      parameters:
+        - name: output_id
+          in: path
+          required: true
+          description: Unique identifier of the output file.
+          schema:
+            type: string
+            example: output_2026_001
+      responses:
+        "200":
+          description: Output file returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutputFile"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -450,6 +519,69 @@ components:
           description: Number of input files returned.
           example: 2
 
+    OutputFile:
+      type: object
+      required:
+        - output_id
+        - filename
+        - format
+        - created_at
+      properties:
+        output_id:
+          type: string
+          description: Unique identifier of the output file.
+          example: output_2026_001
+        filename:
+          type: string
+          description: Name of the output file.
+          example: model_results.csv
+        description:
+          type: string
+          description: Human-readable description of the output file.
+          example: Simulation outputs in IAMC long format.
+        format:
+          type: string
+          description: Format of the output file.
+          enum:
+            - csv
+          example: csv
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time when the output file was created.
+          example: "2026-05-25T16:30:00Z"
+        simulation_id:
+          type: string
+          description: Identifier of the simulation that produced this output file.
+          example: simulation_2026_001
+        download_url:
+          type: string
+          format: uri
+          description: Optional URL for downloading the output file.
+          example: https://example.org/api/v1/outputs/output_2026_001/download
+        warnings:
+          type: array
+          description: Non-blocking issues found while creating the output file.
+          items:
+            type: string
+          example: []
+
+    OutputFileList:
+      type: object
+      required:
+        - items
+        - count
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutputFile"
+        count:
+          type: integer
+          minimum: 0
+          description: Number of output files returned.
+          example: 2
+
     ConfigFile:
       type: object
       required:
@@ -551,12 +683,20 @@ components:
       properties:
         code:
           type: string
-          description: Machine-readable error code.
-          example: input_file_not_found
+          description: Machine-readable error code that is not tied to a specific resource type.
+          example: resource_not_found
         message:
           type: string
           description: Human-readable error message.
-          example: The requested input file could not be found.
+          example: The requested resource could not be found.
+        resource_type:
+          type: string
+          description: Optional type of resource related to the error.
+          example: output_file
+        resource_id:
+          type: string
+          description: Optional identifier of the resource related to the error.
+          example: output_2026_001
         details:
           type: object
           additionalProperties: true
