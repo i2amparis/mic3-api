@@ -160,10 +160,13 @@ paths:
       operationId: updateConfigurationFiles
       summary: Update model configuration files
       description: >
-        Updates one or more model configuration files, such as simulation
-        options, solver settings, or other model-specific configuration files.
-        The model adapter is responsible for validating and applying the
-        uploaded files to the native model structure.
+        Updates model configuration files using a generic two-column CSV file.
+        The CSV must contain a parameter column with the generic setting name
+        to change, such as end_year, and a value column with the requested
+        setting value, such as 2050. Each model adapter maps these generic
+        parameters to its native configuration files and settings. If a model
+        does not support changing a requested parameter, the adapter must report
+        that parameter as unsupported in the response.
       requestBody:
         required: true
         content:
@@ -171,25 +174,28 @@ paths:
             schema:
               type: object
               required:
-                - files
+                - file
               properties:
-                files:
-                  type: array
-                  description: Configuration files to update.
-                  items:
-                    type: string
-                    format: binary
+                file:
+                  type: string
+                  format: binary
+                  description: >
+                    Configuration update CSV file. The file must include two
+                    columns: parameter and value.
                 description:
                   type: string
                   description: Human-readable description of the configuration update.
                   example: Updated simulation options for a baseline run.
+            encoding:
+              file:
+                contentType: text/csv
       responses:
         "200":
           description: Configuration files updated successfully.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ConfigFileList"
+                $ref: "#/components/schemas/ConfigUpdateResult"
         "400":
           $ref: "#/components/responses/BadRequest"
         "422":
@@ -320,6 +326,84 @@ components:
           description: Number of configuration files returned.
           example: 1
 
+    ConfigUpdateResult:
+      type: object
+      required:
+        - updated_files
+        - applied_parameters
+        - unsupported_parameters
+      properties:
+        updated_files:
+          type: array
+          description: Configuration files modified by the model adapter.
+          items:
+            $ref: "#/components/schemas/ConfigFile"
+        applied_parameters:
+          type: array
+          description: Generic configuration parameters successfully applied by the model adapter.
+          items:
+            $ref: "#/components/schemas/ConfigParameterUpdate"
+        unsupported_parameters:
+          type: array
+          description: >
+            Generic configuration parameters that could not be applied because
+            the model does not expose or support the requested setting.
+          items:
+            $ref: "#/components/schemas/UnsupportedConfigParameter"
+        warnings:
+          type: array
+          description: Non-blocking issues found while updating configuration.
+          items:
+            type: string
+          example: []
+
+    ConfigParameterUpdate:
+      type: object
+      required:
+        - parameter
+        - value
+      properties:
+        parameter:
+          type: string
+          description: Generic configuration parameter requested in the uploaded CSV file.
+          example: end_year
+        value:
+          description: Value applied to the native model configuration.
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+          example: 2050
+        native_parameter:
+          type: string
+          description: Native model configuration parameter that was updated.
+          example: simulation.end_year
+
+    UnsupportedConfigParameter:
+      type: object
+      required:
+        - parameter
+        - value
+        - reason
+      properties:
+        parameter:
+          type: string
+          description: Generic configuration parameter requested in the uploaded CSV file.
+          example: end_year
+        value:
+          description: Requested value that could not be applied.
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+          example: 2050
+        reason:
+          type: string
+          description: Explanation of why the parameter cannot be changed for this model.
+          example: This model does not allow users to change the simulation end year.
+
     Error:
       type: object
       required:
@@ -347,7 +431,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     ValidationError:
-      description: The input file did not pass validation.
+      description: The uploaded file did not pass validation.
       content:
         application/json:
           schema:
