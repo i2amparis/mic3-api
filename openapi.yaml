@@ -322,8 +322,7 @@ paths:
       summary: Stream model simulation logs
       description: >
         Streams or returns logs from the current or most recent model
-        simulation. Logs are diagnostic output and should not be used as a
-        substitute for GET /simulate/status.
+        simulation. 
       parameters:
         - name: stream
           in: query
